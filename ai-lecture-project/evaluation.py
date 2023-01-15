@@ -118,7 +118,7 @@ def __generate_part_list_permutations(parts: Set[Part]) -> List[Tuple[Part]]:
 
 if __name__ == '__main__':
     # Load train data
-    with open('graphs.dat', 'rb') as file:
+    with open('data/graphs.dat', 'rb') as file:
         train_graphs: List[Graph] = pickle.load(file)
 
     # Load the final model
