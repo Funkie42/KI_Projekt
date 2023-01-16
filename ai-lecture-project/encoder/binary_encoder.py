@@ -1,15 +1,20 @@
 import numpy as np
-from numpy import ndarray
+from numpy import ndarray, float32
 
 from encoder.abstract_encoder import AbstractEncoder
 from part import Part
 
-
-PART_ID_BITS = 11
-FAMILY_ID_BITS = 5
+# Known Id Range:
+# Part id: 0 - 2270 (both inclusive)
+# Family id: 0 - 100 (both inclusive)
+PART_ID_BITS = 12
+FAMILY_ID_BITS = 7
 
 class BinaryEncoder(AbstractEncoder):
     "Encodes the part id and family id in little endian encoding"
+
+    def get_encoding_size(self):
+        return PART_ID_BITS + FAMILY_ID_BITS
 
     def encode(self, part: Part) -> ndarray:
         array = [0.0] * (PART_ID_BITS + FAMILY_ID_BITS)
@@ -22,7 +27,7 @@ class BinaryEncoder(AbstractEncoder):
             else:
                 array[i] = familyId % 2
                 familyId //= 2
-        return np.array(array, dtype=float)
+        return np.array(array, dtype=float32)
 
     def decode(self, part: ndarray) -> Part:
         bits = [0] * (PART_ID_BITS + FAMILY_ID_BITS)

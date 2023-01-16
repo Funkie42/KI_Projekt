@@ -2,25 +2,33 @@ import unittest
 
 import numpy as np
 
+from encoder.one_hot_encoder import OneHotEncoder
 from encoder.binary_encoder import BinaryEncoder
 from part import Part
 
 
-class TestBinaryEncoder(unittest.TestCase):
+class TestEncoder(unittest.TestCase):
 
-    def setUp(self):
+    def test_decodeself_binary(self):
         self.sut = BinaryEncoder()
-
-    def test_decodeself(self):
         self.verifyEncodeSelf(Part(1, 4))
         self.verifyEncodeSelf(Part(17, 8))
-        self.verifyEncodeSelf(Part(32, 1))
+        self.verifyEncodeSelf(Part(2174, 98))
         self.verifyEncodeSelf(Part(19, 3))
 
-    def test_encode(self):
+    def test_binary_encode(self):
+        self.sut = BinaryEncoder()
         encoding = self.sut.encode(Part(13, 2))
-        expectedEncoding = [1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0] + [0, 1, 0, 0, 0]
+        expectedEncoding = [1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0] + [0, 1, 0, 0, 0, 0, 0]
         self.assertTrue((np.array(expectedEncoding) == encoding).all())
+
+    def test_decodeself_onehot(self):
+        self.sut = OneHotEncoder()
+        self.verifyEncodeSelf(Part(21, 4))
+        self.verifyEncodeSelf(Part(17, 99))
+        self.verifyEncodeSelf(Part(2201, 1))
+        self.verifyEncodeSelf(Part(158, 23))
+
 
     def verifyEncodeSelf(self, part: Part):
         encoding = self.sut.encode(part)

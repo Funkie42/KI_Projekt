@@ -9,6 +9,13 @@ from part import Part
 class AbstractEncoder(ABC):
 
     @abstractmethod
+    def get_encoding_size(self):
+        """
+        Returns the amount of elements an array encoding a part contains.
+        """
+        pass
+
+    @abstractmethod
     def encode(self, part: Part) -> ndarray:
         """
         Encodes the given part in the corresponding encoding.
