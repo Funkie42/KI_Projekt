@@ -1,4 +1,5 @@
 import pickle
+import time
 from typing import List, Tuple
 
 import numpy as np
@@ -14,6 +15,10 @@ from graph import Graph
 from part import Part
 
 import matplotlib.pyplot as plt
+
+USE_CUDA = True
+
+device = "cuda" if USE_CUDA else "cpu"
 
 # Known Id Range:
 # Part id: 0 - 2270 (both inclusive)
@@ -83,17 +88,14 @@ def trainAutoEncoder(network: EncoderTrainingNetwork, X_train, y_train, batch_si
     training_step = 0
 
     for batch_start_index in range(0, len(X_train), batch_size):
-        x = torch.from_numpy(np.array(X_train[batch_start_index:batch_start_index + batch_size]))
-        y = torch.from_numpy(np.array(y_train[batch_start_index:batch_start_index + batch_size]))
-        x.to("cuda")
-        y.to("cuda")
+        x = torch.from_numpy(np.array(X_train[batch_start_index:batch_start_index + batch_size])).to(device)
+        y = torch.from_numpy(np.array(y_train[batch_start_index:batch_start_index + batch_size])).to(device)
 
         loss = network.training_step(x, y)
         training_step = training_step + 1
-        print(f"\rExecuted training step {training_step} with loss {loss}                    ", end="")
+        print(f"\rExecuted training step {training_step} with loss {loss}.                    ", end="")
     print()
     return network
-
 
 rawTrainingData = loadTrainingData()
 print("Training data loaded.")
@@ -103,18 +105,15 @@ print("Training data encoded.")
 
 X_train, X_test, y_train, y_test = train_test_split(data_X, data_y, random_state=1, test_size=0.2)
 
-encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=encoder.get_encoding_size())
-
-print(f"Cuda ready: {torch.cuda.is_available()}")
+encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=encoder.get_encoding_size()).to(device)
 
 for i in range(20):
-    trainAutoEncoder(encoderTrainingNetwork, X_train, y_train, 20)
+    trainAutoEncoder(encoderTrainingNetwork, X_train, y_train, 150)
 
 print("Training complete")
 
 x = list(range(1, encoderTrainingNetwork.generation + 1))
 y = encoderTrainingNetwork.loss_per_step
-print(y[17])
 plt.plot(x, y)
 plt.ylim(0, 0.002)
 plt.show()
