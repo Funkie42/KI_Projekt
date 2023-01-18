@@ -18,8 +18,8 @@ class BinaryEncoder(AbstractEncoder):
 
     def encode(self, part: Part) -> ndarray:
         array = [0.0] * (PART_ID_BITS + FAMILY_ID_BITS)
-        partId = part.get_part_id()
-        familyId = part.get_family_id()
+        partId = int(part.get_part_id())
+        familyId = int(part.get_family_id())
         for i in range(PART_ID_BITS + FAMILY_ID_BITS):
             if (i < PART_ID_BITS):
                 array[i] = partId % 2
