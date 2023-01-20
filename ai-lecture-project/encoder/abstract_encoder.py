@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from numpy import ndarray
+from torch import Tensor
 
 from part import Part
 
@@ -16,7 +17,7 @@ class AbstractEncoder(ABC):
         pass
 
     @abstractmethod
-    def encode(self, part: Part) -> ndarray:
+    def encode(self, part: Part) -> Tensor:
         """
         Encodes the given part in the corresponding encoding.
         This should always return a one-dimensional array or a scalar!
@@ -24,7 +25,7 @@ class AbstractEncoder(ABC):
         pass
 
     @abstractmethod
-    def decode(self, part: ndarray) -> Part:
+    def decode(self, part: Tensor) -> Part:
         """
         Decodes the given encoded part.
         """

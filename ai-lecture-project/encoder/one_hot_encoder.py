@@ -1,5 +1,7 @@
 import numpy as np
+import torch
 from numpy import ndarray, float32
+from torch import Tensor
 
 from encoder.abstract_encoder import AbstractEncoder
 from part import Part
@@ -15,13 +17,13 @@ class OneHotEncoder(AbstractEncoder):
     def get_encoding_size(self):
         return PART_ID_BITS + FAMILY_ID_BITS
 
-    def encode(self, part: Part) -> ndarray:
-        encoding = np.zeros((PART_ID_BITS + FAMILY_ID_BITS), dtype=float32)
+    def encode(self, part: Part) -> Tensor:
+        encoding = torch.from_numpy(np.zeros((PART_ID_BITS + FAMILY_ID_BITS), dtype=float32))
         encoding[int(part.get_part_id())] = 1.0
         encoding[int(part.get_family_id()) + PART_ID_BITS] = 1.0
         return encoding
 
-    def decode(self, part: ndarray) -> Part:
+    def decode(self, part: Tensor) -> Part:
         maxActivationFamily = 0
         maxActivationPart = 0
         partId = 0
