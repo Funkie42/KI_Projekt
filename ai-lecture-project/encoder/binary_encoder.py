@@ -1,5 +1,3 @@
-import numpy as np
-from numpy import ndarray, float32
 from torch import Tensor
 
 from encoder.abstract_encoder import AbstractEncoder

@@ -78,8 +78,6 @@ def loadTrainingData():
     return constructTrainingData(train_graphs)
 
 def prepareTrainingData(rawTrainingData, encoder: AbstractEncoder):
-    for i in rawTrainingData:
-        encoder.encode(i[0])
     data_X = [encoder.encode(i[0]) for i in rawTrainingData]
     data_y = [encoder.encode(i[1]) for i in rawTrainingData]
 
