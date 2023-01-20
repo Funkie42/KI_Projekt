@@ -12,14 +12,12 @@ import torch.nn.functional as F
 from encoder.abstract_encoder import AbstractEncoder
 from encoder.binary_encoder import BinaryEncoder
 from encoder.one_hot_encoder import OneHotEncoder
+from config.config import device
 from graph import Graph
 from part import Part
 
 import matplotlib.pyplot as plt
 
-USE_CUDA = True
-
-device = "cuda" if USE_CUDA else "cpu"
 
 # Known Id Range:
 # Part id: 0 - 2270 (both inclusive)
@@ -128,49 +126,60 @@ def plotResults(results: Tuple[List[float], List[int], List[float]], generation:
     plt.plot(valLossGenerations, valLoss, color=valcolor, linestyle='dashed')
     pass
 
-rawTrainingData = loadTrainingData()
-print("Training data loaded.")
 
-one_hot = OneHotEncoder()
-binary = BinaryEncoder()
-one_hot_data = prepareTrainingData(rawTrainingData, one_hot)
-binary_data = prepareTrainingData(rawTrainingData, binary)
-print("Training data encoded.")
+def trainOneHot():
+    rawTrainingData = loadTrainingData()
+    print("Training data loaded.")
+    one_hot = OneHotEncoder()
+    one_hot_data = prepareTrainingData(rawTrainingData, one_hot)
+    print("Training data encoded.")
 
-# encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=one_hot.get_encoding_size()).to(device)
-# trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, one_hot_data, batch_size=10, cycles=1)
-# plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 10, 1 cycle", color='green')
-#
-# encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=one_hot.get_encoding_size()).to(device)
-# trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, one_hot_data, batch_size=150, cycles=15)
-# plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 150, 15 cycles", color='red')
-#
-# encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=one_hot.get_encoding_size()).to(device)
-# trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, one_hot_data, batch_size=350, cycles=35)
-# plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 350, 35 cycles", color='blue')
-#
-# plt.title("Using a One-Hot Encoder")
-# plt.xlabel("Generation")
-# plt.ylabel("Loss")
-# plt.legend(loc="lower left")
-# plt.ylim(0.0009, 0.0017)
-# plt.show()
+    encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=one_hot.get_encoding_size()).to(device)
+    trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, one_hot_data, batch_size=10, cycles=1)
+    plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 10, 1 cycle", color='green')
 
-encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=binary.get_encoding_size()).to(device)
-trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, binary_data, batch_size=10, cycles=1)
-plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 10, 1 cycle", color='green')
+    encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=one_hot.get_encoding_size()).to(device)
+    trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, one_hot_data, batch_size=150, cycles=15)
+    plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 150, 15 cycles", color='red')
 
-encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=binary.get_encoding_size()).to(device)
-trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, binary_data, batch_size=150, cycles=15)
-plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 150, 15 cycles", color='red')
+    encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=one_hot.get_encoding_size()).to(device)
+    trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, one_hot_data, batch_size=350, cycles=35)
+    plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 350, 35 cycles", color='blue')
 
-encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=binary.get_encoding_size()).to(device)
-trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, binary_data, batch_size=350, cycles=35)
-plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 350, 35 cycles", color='blue')
+    plt.title("Using a One-Hot Encoder")
+    plt.xlabel("Generation")
+    plt.ylabel("Loss")
+    plt.legend(loc="lower left")
+    plt.ylim(0.0009, 0.0017)
+    plt.show()
 
-plt.title("Using a Binary Encoder")
-plt.xlabel("Generation")
-plt.ylabel("Loss")
-plt.legend(loc="lower left")
-plt.ylim(0.1, 0.4)
-plt.show()
+def trainBinary():
+    rawTrainingData = loadTrainingData()
+    print("Training data loaded.")
+    binary = BinaryEncoder()
+    binary_data = prepareTrainingData(rawTrainingData, binary)
+    print("Training data encoded.")
+
+    encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=binary.get_encoding_size()).to(device)
+    trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, binary_data, batch_size=10, cycles=1)
+    plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 10, 1 cycle", color='green')
+
+    encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=binary.get_encoding_size()).to(device)
+    trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, binary_data, batch_size=150, cycles=15)
+    plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 150, 15 cycles", color='red')
+
+    encoderTrainingNetwork = EncoderTrainingNetwork(input_output_size=binary.get_encoding_size()).to(device)
+    trainingResults = trainAndValidateAutoEncoder(encoderTrainingNetwork, binary_data, batch_size=350, cycles=35)
+    plotResults(trainingResults, encoderTrainingNetwork.generation, legend="Batch size 350, 35 cycles", color='blue')
+
+    plt.title("Using a Binary Encoder")
+    plt.xlabel("Generation")
+    plt.ylabel("Loss")
+    plt.legend(loc="lower left")
+    plt.ylim(0.1, 0.4)
+    plt.show()
+
+
+if __name__ == '__main__':
+    trainOneHot()
+    #trainBinary()
