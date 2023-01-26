@@ -1,10 +1,9 @@
 import unittest
 
-import numpy as np
 import torch
 
-from encoder.one_hot_encoder import OneHotEncoder
 from encoder.binary_encoder import BinaryEncoder
+from encoder.one_hot_encoder import OneHotEncoder
 from part import Part
 
 
@@ -29,7 +28,6 @@ class TestEncoder(unittest.TestCase):
         self.verifyEncodeSelf(Part(17, 99))
         self.verifyEncodeSelf(Part(2201, 1))
         self.verifyEncodeSelf(Part(158, 23))
-
 
     def verifyEncodeSelf(self, part: Part):
         encoding = self.sut.encode(part)
