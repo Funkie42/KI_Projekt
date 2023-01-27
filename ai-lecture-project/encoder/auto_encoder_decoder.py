@@ -47,7 +47,6 @@ def loadPretrainedAutoEncoder() -> FullAutoEncoder:
 
     encoder = AutoEncoder(encode1, encode2)
     decoder = AutoDecoder(decode1, decode2)
-    print(FullAutoEncoder(preEncoder, encoder, decoder).encode(Part(154, 17)))
     return FullAutoEncoder(preEncoder, encoder, decoder)
 
 def createAndSavePretrainedAutoEncoder():
