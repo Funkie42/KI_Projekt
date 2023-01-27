@@ -77,6 +77,8 @@ def loadTrainingData():
         train_graphs: List[Graph] = pickle.load(file)
     return constructTrainingData(train_graphs)
 
+
+# Returns input data and target of training and testing data sets
 def prepareTrainingData(rawTrainingData, encoder: AbstractEncoder):
     for i in rawTrainingData:
         encoder.encode(i[0])
@@ -131,6 +133,7 @@ def trainOneHot():
     rawTrainingData = loadTrainingData()
     print("Training data loaded.")
     one_hot = OneHotEncoder()
+
     one_hot_data = prepareTrainingData(rawTrainingData, one_hot)
     print("Training data encoded.")
 
