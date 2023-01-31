@@ -1,14 +1,15 @@
 import math
-import pickle
-from typing import List
 
 import torch
 import torch.nn.functional as F
-from torch import nn, Tensor
+from matplotlib import pyplot as plt
+from torch import nn, optim, Tensor
 from torch.nn import LSTMCell
+from torch.utils.data import random_split, DataLoader
 
-from encoder.binary_encoder import BinaryEncoder
-from graph import Graph
+from config.config import device
+from datasets.edge_vector_dataset import EdgeVectorDataset
+from encoder.one_hot_encoder import OneHotEncoder
 from lstm.positional_encoding import PositionalEncoding
 
 
@@ -54,8 +55,8 @@ class LSTMGraphPredictor(nn.Module):
         """
         batch_size = len(x)
         lstm_input = self.inputToLSTMSequence(x)
-        lstm_hidden_state = torch.zeros(batch_size, self.builder_hidden_dim)
-        lstm_cell_state = torch.zeros(batch_size, self.builder_hidden_dim)
+        lstm_hidden_state = torch.zeros(batch_size, self.builder_hidden_dim).to(device)
+        lstm_cell_state = torch.zeros(batch_size, self.builder_hidden_dim).to(device)
 
         # Iterate over sequence
         for elem in lstm_input:
@@ -175,6 +176,10 @@ class LSTMGraphPredictor(nn.Module):
         return adj
 
     def adjMatrixToEdgeVector(self, adj_matrix: Tensor) -> Tensor:
+        """
+        Turns the given adjacency matrix into an edge vector. You may also pass a batch of adjacency matrices
+        to get a batch of edge vectors.
+        """
         unsqueezed = False
         if len(adj_matrix.shape) < 3:
             adj_matrix = adj_matrix.unsqueeze(0)
@@ -182,7 +187,7 @@ class LSTMGraphPredictor(nn.Module):
         axis_size = adj_matrix.shape[2]
 
         if axis_size != adj_matrix.shape[1]:
-            raise RuntimeError("The given adjacency matrix's dimensions 1 and 2 are not of the same size! How can this be an adjacency matrix??")
+            raise RuntimeError("The given adjacency matrix's dimensions are not of the same size! How can this be an adjacency matrix??")
 
         edge_vector = []
         for i1 in range(axis_size - 1):
@@ -196,18 +201,49 @@ class LSTMGraphPredictor(nn.Module):
         return edge_vector
 
 if __name__ == '__main__':
-    encoder = BinaryEncoder()
-    network = LSTMGraphPredictor(encoder.get_encoding_size())
 
-    with open('../data/graphs.dat', 'rb') as file:
-        train_graphs: List[Graph] = pickle.load(file)
+    encoder = OneHotEncoder()
+    base_dataset = EdgeVectorDataset(part_encoder=encoder)
 
-    graph = train_graphs[0]
-    print([encoder.encode(p) for p in graph.get_parts()])
-    sequence = torch.stack([encoder.encode(p) for p in graph.get_parts()])
-    print(f"Sequence: {sequence}")
+    (train_data, val_data, test_data) = random_split(base_dataset, [0.7, 0.15, 0.15], generator=torch.Generator().manual_seed(7))
 
-    edge_vector = network(sequence)
-    print(edge_vector)
-    adj = network.edgeVectorToAdjMatrix(edge_vector)
-    print(adj)
+    train_data_loader = DataLoader(train_data, batch_size=1, shuffle=True)
+
+    network = LSTMGraphPredictor(encoder.get_encoding_size()).to(device)
+
+    optimizer = optim.SGD(network.parameters(), lr=0.000001)
+    lossCriterion = nn.MSELoss()
+    loss_per_step = []
+    val_loss = []
+
+    data_sets = len(train_data_loader)
+    val_iterator = iter(val_data)
+
+    for (index, (parts, label)) in enumerate(train_data_loader):
+        prediction = network(parts)
+        loss = lossCriterion(prediction, label)
+        loss_per_step.append(float(loss))
+        loss.backward()
+        optimizer.step()
+        print(f"\rExecuted training step {index}/{data_sets}. Loss={float(loss)}", end="")
+
+        if index % 10 == 0:
+            (parts, label) = next(val_iterator)
+            prediction = network(parts)
+            loss = lossCriterion(prediction, label)
+            val_loss.append(float(loss))
+        if index > 500:
+            break
+
+    x_loss = list(range(1, len(loss_per_step)+1))
+    x_val = list(range(1, 10*len(val_loss)+1, 10))
+    plt.plot(x_loss, loss_per_step, color='blue', label='Training loss')
+    plt.plot(x_val, val_loss, color='red', label='Validation loss')
+    plt.title("LSTM Network loss")
+    plt.xlabel("Generation")
+    plt.ylabel("Loss")
+    plt.legend(loc="lower left")
+    plt.ylim(0, 0.5)
+    plt.show()
+
+    print()
