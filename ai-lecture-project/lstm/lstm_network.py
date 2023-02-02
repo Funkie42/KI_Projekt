@@ -9,7 +9,7 @@ from torch.utils.data import random_split, DataLoader
 
 from config.config import device
 from datasets.edge_vector_dataset import EdgeVectorDataset
-from encoder.one_hot_encoder import OneHotEncoder
+from encoder.auto_encoder_decoder import loadPretrainedAutoEncoder
 from lstm.positional_encoding import PositionalEncoding
 
 
@@ -30,7 +30,9 @@ class LSTMGraphPredictor(nn.Module):
         self.query_fc2 = nn.Linear(600, self.query_size)
 
         self.evaluator_fc1 = nn.Linear(self.construction_plan_size + self.query_size, 1000)
+        self.evaluator_norm1 = nn.BatchNorm1d(num_features=1000)
         self.evaluator_fc2 = nn.Linear(1000, 100)
+        self.evaluator_norm2 = nn.BatchNorm1d(num_features=100)
         self.evaluator_fc3 = nn.Linear(100, 10)
         self.evaluator_fc4 = nn.Linear(10, 1)
 
@@ -98,9 +100,11 @@ class LSTMGraphPredictor(nn.Module):
         """
         evaluator_input = torch.cat((constructionPlan, query), dim=1)
 
-        eval = F.relu(self.evaluator_fc1(evaluator_input))
-        eval = F.relu(self.evaluator_fc2(eval))
-        eval = F.relu(self.evaluator_fc3(eval))
+        eval = self.evaluator_fc1(evaluator_input)
+        #eval = self.evaluator_norm1(eval)
+        eval = self.evaluator_fc2(eval)
+        #eval = self.evaluator_norm2(eval)
+        eval = self.evaluator_fc3(eval)
         eval = F.relu(self.evaluator_fc4(eval))
 
         return torch.squeeze(eval, 1) # Turn output per batch from 1-element-vector into scalar
@@ -122,27 +126,45 @@ class LSTMGraphPredictor(nn.Module):
         half.)
         """
         unsqueezed = False
-        if (len(x.shape) == 2):
+        if len(x.shape) == 2:
             unsqueezed = True
             x = torch.unsqueeze(x, 0)
 
         amount_parts = x.shape[1]
-        edge_vectors = []
+        batch_size = x.shape[0]
+        edge_vector_size = self.calcEdgeVectorSizeFromAdjMatrixAxisSize(amount_parts)
 
         construction_plan = self.makeConstructionPlan(x)
 
+        query_list = []
         for part1Index in range(amount_parts - 1):
             for part2Index in range(part1Index+1, amount_parts):
-                query = self.makeQuery(x, part1Index, part2Index)
-                queryResult = self.evaluateQuery(construction_plan, query)
-                edge_vectors.append(queryResult)
+                query_list.append(self.makeQuery(x, part1Index, part2Index))
 
-        edge_vector_result = torch.stack(edge_vectors).T
+        # We want to execute all queries at once, so we intertwine them with the batches.
+
+        # [query_sequence_length, batch_size, query_size]
+        query_tensor = torch.stack(query_list)
+
+        # [query_sequence_length * batch_size, query_size]
+        # First dimension ordering is: B1Q1, B2Q1, B3Q1, ..., B1Q2, B2Q2, B3Q2
+        multi_query = query_tensor.reshape(-1, self.query_size)
+
+        # Query sequence length is the same as edge vector length.
+        # [edge_vector_length * batch_size]
+        multi_construction_plan = construction_plan.repeat(edge_vector_size, 1)
+        multi_result = self.evaluateQuery(multi_construction_plan, multi_query)
+
+        # [edge_vector_length, batch_size]
+        swapped_result = multi_result.reshape(edge_vector_size, batch_size)
+
+        # [batch_size, edge_vector_length]
+        result = swapped_result.transpose(0, 1)
 
         if unsqueezed:
-            edge_vector_result = torch.squeeze(edge_vector_result)
+            result = torch.squeeze(result)
 
-        return edge_vector_result
+        return result
 
     def calcEdgeVectorSizeFromAdjMatrixAxisSize(self, adjMatrixAxisSize: int) -> int:
         return (adjMatrixAxisSize ** 2 - adjMatrixAxisSize) // 2
@@ -202,16 +224,17 @@ class LSTMGraphPredictor(nn.Module):
 
 if __name__ == '__main__':
 
-    encoder = OneHotEncoder()
+    encoder = loadPretrainedAutoEncoder()
     base_dataset = EdgeVectorDataset(part_encoder=encoder)
 
     (train_data, val_data, test_data) = random_split(base_dataset, [0.7, 0.15, 0.15], generator=torch.Generator().manual_seed(7))
 
+    torch.manual_seed(7)
     train_data_loader = DataLoader(train_data, batch_size=1, shuffle=True)
 
     network = LSTMGraphPredictor(encoder.get_encoding_size()).to(device)
 
-    optimizer = optim.SGD(network.parameters(), lr=0.000001)
+    optimizer = optim.SGD(network.parameters(), lr=0.5)
     lossCriterion = nn.MSELoss()
     loss_per_step = []
     val_loss = []
@@ -220,20 +243,25 @@ if __name__ == '__main__':
     val_iterator = iter(val_data)
 
     for (index, (parts, label)) in enumerate(train_data_loader):
-        prediction = network(parts)
-        loss = lossCriterion(prediction, label)
-        loss_per_step.append(float(loss))
-        loss.backward()
-        optimizer.step()
-        print(f"\rExecuted training step {index}/{data_sets}. Loss={float(loss)}", end="")
+        for i in range(500):
+            optimizer.zero_grad()
+            prediction = network(parts)
+            loss = lossCriterion(prediction, label)
+            loss_per_step.append(float(loss))
+            #print(f"Before backward: {network.query_fc1.weight.grad}")
+            loss.backward()
+            #print(f"After backward: {network.query_fc1.weight.grad}")
+            optimizer.step()
+        #print(f"\rExecuted training step {index}/{data_sets}. Loss={float(loss)}", end="")
 
+        break
         if index % 10 == 0:
+            network.eval()
             (parts, label) = next(val_iterator)
             prediction = network(parts)
             loss = lossCriterion(prediction, label)
             val_loss.append(float(loss))
-        if index > 500:
-            break
+            network.train()
 
     x_loss = list(range(1, len(loss_per_step)+1))
     x_val = list(range(1, 10*len(val_loss)+1, 10))
