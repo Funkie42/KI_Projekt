@@ -1,4 +1,5 @@
 import math
+from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -18,6 +19,8 @@ class LSTMGraphPredictor(nn.Module):
     def __init__(self, encoded_part_size: int):
         super().__init__()
 
+        self.part_encoding_size = encoded_part_size
+
         self.input_dim = encoded_part_size
         self.builder_hidden_dim = 1500
         self.construction_plan_size = self.builder_hidden_dim
@@ -25,7 +28,7 @@ class LSTMGraphPredictor(nn.Module):
 
         self.query_size = 300
         self.query_in_size = 2 * encoded_part_size
-        self.query_pos_encoder = PositionalEncoding(d_model=self.query_in_size)
+        self.query_pos_encoder = PositionalEncoding(d_model=self.part_encoding_size)
         self.query_fc1 = nn.Linear(self.query_in_size, 600)
         self.query_fc2 = nn.Linear(600, self.query_size)
 
@@ -66,26 +69,31 @@ class LSTMGraphPredictor(nn.Module):
 
         return lstm_hidden_state
 
-    def makeQuery(self, x, part1_index, part2_index):
+    def makeEncodedPartPair(self, x, part1_index, part2_index):
         """
-        Makes a query from the given input using the parts at the given indices. The input must have the same shape
-        as required by `forward`.
+        Constructs the input for the query creator from the given input at the given indices. The input must have the
+        shape [sequence_len, batch_size, part_encoding_size]
+
+        Returns a tensor of size [batch_size, encoding_size*2]. The first dimension is the batch, the second dimension
+        the input to the query creator.
+        """
+        part1 = x[part1_index] # For each batch, get the element at the part index
+        part2 = x[part2_index]
+
+        # Concatenate parts
+        return torch.cat((part1, part2), dim=1)
+
+    def makeQuery(self, prepared_queries):
+        """
+        Makes a query from the given two encoded parts. I.e., the output of makeEncodedPartPair.
+        The input must be of shape [batch_size, 2*encoding_size].
 
         Returns a tensor of the following shape:
         Dimension 0: batch
         Dimension 1: query (size is always self.query_size)
         """
-        part1 = x[:, part1_index] # For each batch, get the element at the part index
-        part2 = x[:, part2_index]
-
-        # Concatenate parts
-        raw_parts = torch.cat((part1, part2), dim=1)
-
-        # Add positional encoding
-        positionally_encoded_parts = self.query_pos_encoder(raw_parts.unsqueeze(0)).squeeze(0)
-
         # Pass through FCN
-        query_out = F.relu(self.query_fc1(positionally_encoded_parts))
+        query_out = F.relu(self.query_fc1(prepared_queries))
         query_out = F.relu(self.query_fc2(query_out))
 
         return query_out
@@ -136,24 +144,34 @@ class LSTMGraphPredictor(nn.Module):
 
         construction_plan = self.makeConstructionPlan(x)
 
-        query_list = []
+        positionally_encoded_parts = x.transpose(0, 1) # swap batch and sequence
+        positionally_encoded_parts = self.query_pos_encoder(positionally_encoded_parts)
+
+        batched_part_pairs = []
         for part1Index in range(amount_parts - 1):
             for part2Index in range(part1Index+1, amount_parts):
-                query_list.append(self.makeQuery(x, part1Index, part2Index))
+                batched_part_pairs.append(self.makeEncodedPartPair(positionally_encoded_parts, part1Index, part2Index))
 
-        # We want to execute all queries at once, so we intertwine them with the batches.
+        batched_part_pairs = torch.stack(batched_part_pairs)
 
-        # [query_sequence_length, batch_size, query_size]
-        query_tensor = torch.stack(query_list)
+        # We want to make and execute all queries at once, so we intertwine them with the batches.
+        # Currently prepared_batched_queries contains a sequence of batched queries:
+        # [sequence_length, batch_size, 2*part_encoding_size]
+        # Now we want to merge the sequence length and batch size dimension, since we can execute all queries of each
+        # batch in parallel as well.
+        # Ordering is S1B1, S1B2, S1B3, ..., S2B1, S2B2, ...
+        merged_batched_part_pairs = batched_part_pairs.reshape(-1, 2 * self.part_encoding_size)
 
-        # [query_sequence_length * batch_size, query_size]
-        # First dimension ordering is: B1Q1, B2Q1, B3Q1, ..., B1Q2, B2Q2, B3Q2
-        multi_query = query_tensor.reshape(-1, self.query_size)
+
+        # Now, pass all of these queries through the query maker
+        # Output shape is:
+        # [sequence_length * batch_size, query_size]
+        multi_queries = self.makeQuery(merged_batched_part_pairs)
 
         # Query sequence length is the same as edge vector length.
         # [edge_vector_length * batch_size]
         multi_construction_plan = construction_plan.repeat(edge_vector_size, 1)
-        multi_result = self.evaluateQuery(multi_construction_plan, multi_query)
+        multi_result = self.evaluateQuery(multi_construction_plan, multi_queries)
 
         # [edge_vector_length, batch_size]
         swapped_result = multi_result.reshape(edge_vector_size, batch_size)
@@ -222,6 +240,43 @@ class LSTMGraphPredictor(nn.Module):
             edge_vector = edge_vector.squeeze(0)
         return edge_vector
 
+def collate_encoded_parts_list(graphs_and_labels: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, Tensor]:
+    """
+    Collate function for edge_vector labelled and part-encoded graphs. The first element of each tuple is the parts
+    entry, the second element the label (edge vector). Each parts entry must be a two-dimensional tensor where
+    the first dimension is the parts sequence and the second dimension is the encoding for each part.
+    All elements must have the same encoding size.
+
+    Returns a 2-tuple. The first element is the tensor containing a batch input, the second element is the labelling.
+    """
+    encoding_size = len(graphs_and_labels[0][0][0])
+    max_amount_parts = 0
+    max_edge_vector_size = 0
+    for (g, l) in graphs_and_labels:
+        if len(g) > max_amount_parts:
+            max_amount_parts = len(g)
+            max_edge_vector_size = len(l)
+
+    result_graphs = []
+    result_labels = []
+    for (g, l) in graphs_and_labels:
+        result_graph = g
+        result_label = l
+        length = len(g)
+        if length < max_amount_parts:
+            zero_parts = torch.zeros((max_amount_parts - length, encoding_size))
+            result_graph = torch.cat((zero_parts, g), dim=0)
+            zero_labels = torch.zeros(max_edge_vector_size - len(l))
+            # Since we prepended the "null" parts, the edge vector's first elements will refer to those. Thus,
+            # we can also set all of them to zero.
+            result_label = torch.cat((zero_labels, l), dim=0)
+        result_graphs.append(result_graph)
+        result_labels.append(result_label)
+    return torch.stack(result_graphs), torch.stack(result_labels)
+
+def get_gradient_size(module) -> float:
+    return float(module.weight.grad.pow(2).sum())
+
 if __name__ == '__main__':
 
     encoder = loadPretrainedAutoEncoder()
@@ -230,12 +285,12 @@ if __name__ == '__main__':
     (train_data, val_data, test_data) = random_split(base_dataset, [0.7, 0.15, 0.15], generator=torch.Generator().manual_seed(7))
 
     torch.manual_seed(7)
-    train_data_loader = DataLoader(train_data, batch_size=1, shuffle=True)
+    train_data_loader = DataLoader(train_data, batch_size=100, collate_fn=collate_encoded_parts_list, shuffle=True)
 
     network = LSTMGraphPredictor(encoder.get_encoding_size()).to(device)
 
     optimizer = optim.SGD(network.parameters(), lr=0.5)
-    lossCriterion = nn.MSELoss()
+    lossCriterion = nn.MSELoss() # try cross-entropy / multi-class-classification
     loss_per_step = []
     val_loss = []
 
@@ -243,18 +298,18 @@ if __name__ == '__main__':
     val_iterator = iter(val_data)
 
     for (index, (parts, label)) in enumerate(train_data_loader):
-        for i in range(500):
-            optimizer.zero_grad()
-            prediction = network(parts)
-            loss = lossCriterion(prediction, label)
-            loss_per_step.append(float(loss))
-            #print(f"Before backward: {network.query_fc1.weight.grad}")
-            loss.backward()
-            #print(f"After backward: {network.query_fc1.weight.grad}")
-            optimizer.step()
-        #print(f"\rExecuted training step {index}/{data_sets}. Loss={float(loss)}", end="")
+        optimizer.zero_grad()
+        prediction = network(parts)
+        loss = lossCriterion(prediction, label)
 
-        break
+        loss_per_step.append(float(loss))
+        #print(f"Before backward: {network.query_fc1.weight.grad}")
+        loss.backward()
+        #print(f"After backward: {network.query_fc1.weight.grad}")
+
+        optimizer.step()
+        print(f"\rExecuted training step {index}/{data_sets}. Loss={float(loss)}", end="")
+
         if index % 10 == 0:
             network.eval()
             (parts, label) = next(val_iterator)
@@ -273,5 +328,16 @@ if __name__ == '__main__':
     plt.legend(loc="lower left")
     plt.ylim(0, 0.5)
     plt.show()
+
+    # plt.plot(x_loss, grad_qf1, color='red', label='Gradient query fc1')
+    # plt.plot(x_loss, grad_qe1, color='blue', label='Gradient evaluator fc1')
+    # plt.plot(x_loss, grad_qe4, color='green', label='Gradient evaluator fc4')
+    #
+    # plt.title("LSTM Gradient sizes")
+    # plt.xlabel("Generation")
+    # plt.ylabel("Gradient length")
+    # plt.legend(loc="lower left")
+    # plt.ylim(0, 0.001)
+    # plt.show()
 
     print()

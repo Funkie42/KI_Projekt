@@ -32,7 +32,7 @@ class FullAutoEncoder(AbstractEncoder):
         return self.preEncoder.decode(self.decoder.decodeTensor(part))
 
 def loadPretrainedAutoEncoder() -> FullAutoEncoder:
-    state = torch.load('../data/trained_auto_encoder_decoder.dat')
+    state = torch.load('../data/trained_auto_encoder_decoder.dat', map_location=torch.device(device))
     preEncoder = OneHotEncoder()
 
     encode1 = nn.Linear(preEncoder.get_encoding_size(), auto_encoder_training_intermediate_layer_size).to(device)
