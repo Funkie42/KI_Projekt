@@ -2,7 +2,7 @@ from typing import List, Dict
 
 import torch
 
-from config.config import device
+from config.config import preload_device
 from datasets.graph_dataset import GraphDataset
 from encoder.abstract_encoder import AbstractEncoder
 from node import Node
@@ -20,9 +20,9 @@ class EdgeVectorDataset(GraphDataset):
         for index in range(len(self)):
             (parts, graph) = super().__getitem__(index)
             if part_encoder:
-                parts = torch.stack([part_encoder.encode(p) for p in parts]).to(device)
+                parts = torch.stack([part_encoder.encode(p) for p in parts]).to(preload_device)
 
-            self.dataset.append((parts, self.toEdgeVector(graph).to(device)))
+            self.dataset.append((parts, self.toEdgeVector(graph).to(preload_device)))
 
     def toEdgeVector(self, graph):
         nodelist: List[Node] = list(graph.get_nodes())

@@ -1,3 +1,5 @@
+data/trained_lstm*.dat
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
