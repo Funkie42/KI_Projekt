@@ -3,6 +3,7 @@ from typing import List
 
 from torch.utils.data import Dataset
 
+from config.config import root_path
 from graph import Graph
 
 
@@ -12,7 +13,7 @@ class GraphDataset(Dataset):
     """
 
     def __init__(self):
-        with open('../data/graphs.dat', 'rb') as file:
+        with open(f"{root_path}/data/graphs.dat", 'rb') as file:
             self.graphs: List[Graph] = pickle.load(file)
 
     def __len__(self):
