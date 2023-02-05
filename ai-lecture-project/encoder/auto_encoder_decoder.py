@@ -32,7 +32,9 @@ class FullAutoEncoder(AbstractEncoder):
         return self.preEncoder.decode(self.decoder.decodeTensor(part))
 
 def loadPretrainedAutoEncoder() -> FullAutoEncoder:
-    state = torch.load('../data/trained_auto_encoder_decoder.dat')
+
+    state = torch.load('../data/trained_auto_encoder_decoder.dat') if torch.cuda.is_available() \
+        else torch.load('../data/trained_auto_encoder_decoder.dat', map_location=torch.device('cpu'))
     preEncoder = OneHotEncoder()
 
     encode1 = nn.Linear(preEncoder.get_encoding_size(), auto_encoder_training_intermediate_layer_size).to(device)
@@ -47,7 +49,7 @@ def loadPretrainedAutoEncoder() -> FullAutoEncoder:
 
     encoder = AutoEncoder(encode1, encode2)
     decoder = AutoDecoder(decode1, decode2)
-    print(FullAutoEncoder(preEncoder, encoder, decoder).encode(Part(154, 17)))
+    #print(FullAutoEncoder(preEncoder, encoder, decoder).encode(Part(154, 17)))
     return FullAutoEncoder(preEncoder, encoder, decoder)
 
 def createAndSavePretrainedAutoEncoder():
@@ -79,4 +81,5 @@ def createAndSavePretrainedAutoEncoder():
     plt.show()
 
 if __name__ == '__main__':
-    createAndSavePretrainedAutoEncoder()
+    #createAndSavePretrainedAutoEncoder()
+    encoder = loadPretrainedAutoEncoder()
