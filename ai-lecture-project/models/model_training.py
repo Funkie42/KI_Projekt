@@ -19,7 +19,7 @@ encoder = auto_encoder.loadPretrainedAutoEncoder()
 
 input_dim = 101
 hidden_dim = 100
-output_dim = 31
+output_dim = 30
 
 
 def constructModelTrainingData() -> (Tensor, Tensor):
@@ -45,19 +45,15 @@ def constructModelTrainingData() -> (Tensor, Tensor):
 
         for (node, connectedNodes) in g.get_edges().items():
             id_float = float(node.get_id()) / output_dim
-            result_node_tensor = torch.cat((torch.tensor([id_float]), torch.zeros(output_dim - 1)))
+            result_node_tensor = torch.zeros(output_dim)
 
             for connectedNode in connectedNodes:
-                result_node_tensor[connectedNode.get_id() + 1] = 1
-                #result_edges.append((node.get_part(), connectedNode.get_part()))
+                result_node_tensor[connectedNode.get_id()] = 1
+                result_node_tensor[node.get_id()] = 1
 
             result_nodes_list.append(result_node_tensor)
 
         input_nodes_tensor = torch.stack(input_nodes)
-        #scaled_input_nodes_tensor = torch.zeros(input_dim, output_dim)
-        #original_size = input_nodes_tensor.size()
-
-        #scaled_input_nodes_tensor[:original_size[0], :original_size[1]] = input_nodes_tensor
         encoded_nodes_tensor.append(input_nodes_tensor)
 
         result_nodes_tensor = torch.stack(result_nodes_list)
@@ -118,13 +114,21 @@ for epoch in range(n_epochs):
                 # Forward pass only to get logits/output
                 outputs = model(input)
 
-                # Get predictions from the maximum value
-                _, predicted = torch.max(outputs.data, dim=0)
+                # Get predictions from the maximum value)
+                _, predicted_edge_node_ids = torch.topk(outputs.data, dim=0, k=2)
+
+                # Get the actual node edge ids
+                _, edge_node_ids = torch.topk(validate, dim=0, k=2)
 
                 # Total number of labels
                 total += validate.size(0)
 
                 # Total correct predictions
+                for edge in validate:
+                    pass
+
+
+
                 correct += (predicted == validate).sum()
 
             accuracy = 100 * correct / total
