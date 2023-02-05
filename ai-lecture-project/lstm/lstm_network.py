@@ -47,7 +47,6 @@ class LSTMGraphPredictor(nn.Module):
         torch.nn.init.kaiming_uniform_(self.query_fc2.weight, nonlinearity='relu')
         torch.nn.init.kaiming_uniform_(self.evaluator_fc1.weight, nonlinearity='relu')
         torch.nn.init.kaiming_uniform_(self.evaluator_fc2.weight, nonlinearity='relu')
-        torch.nn.init.kaiming_uniform_(self.evaluator_fc3.weight, nonlinearity='relu')
 
     def inputToLSTMSequence(self, x):
         """
@@ -105,6 +104,7 @@ class LSTMGraphPredictor(nn.Module):
         # Pass through FCN
         query_out = F.relu(self.query_fc1(prepared_queries))
         query_out = F.relu(self.query_fc2(query_out))
+        # Not using ReLU here, because it would screw over the sigmoid loss for probability calculation
         query_out = self.query_norm(query_out)
 
         return query_out
@@ -123,7 +123,7 @@ class LSTMGraphPredictor(nn.Module):
         eval = self.evaluator_norm1(eval)
         eval = F.relu(self.evaluator_fc2(eval))
         eval = self.evaluator_norm2(eval)
-        eval = F.relu(self.evaluator_fc3(eval))
+        eval = self.evaluator_fc3(eval)
         eval = torch.sigmoid(self.evaluator_fc4(eval))
 
         return torch.squeeze(eval, 1)  # Turn output per batch from 1-element-vector into scalar
@@ -151,7 +151,7 @@ class LSTMGraphPredictor(nn.Module):
 
         amount_parts = x.shape[1]
         batch_size = x.shape[0]
-        edge_vector_size = self.calcEdgeVectorSizeFromAdjMatrixAxisSize(amount_parts)
+        edge_vector_size = calcEdgeVectorSizeFromAdjMatrixAxisSize(amount_parts)
 
         construction_plan = self.makeConstructionPlan(x)
 
@@ -194,62 +194,65 @@ class LSTMGraphPredictor(nn.Module):
 
         return result
 
-    def calcEdgeVectorSizeFromAdjMatrixAxisSize(self, adjMatrixAxisSize: int) -> int:
-        return (adjMatrixAxisSize ** 2 - adjMatrixAxisSize) // 2
+def calcEdgeVectorSizeFromAdjMatrixAxisSize(adjMatrixAxisSize: int) -> int:
+    return (adjMatrixAxisSize ** 2 - adjMatrixAxisSize) // 2
 
-    def calcAdjMatrixAxisSizeFromEdgeVectorSize(self, edgeVectorSize: int) -> int:
-        return math.isqrt(2 * edgeVectorSize) + 1
 
-    def edgeVectorToAdjMatrix(self, edge_vector: Tensor) -> Tensor:
-        """
-        Converts an edge vector tensor to an adjacency matrix.
-        The input must be of shape [batch_size (can be omitted), edge_vector_size].
-        """
-        unsqueezed = False
-        if len(edge_vector.shape) == 1:
-            edge_vector = edge_vector.unsqueeze(0)
+def calcAdjMatrixAxisSizeFromEdgeVectorSize(edgeVectorSize: int) -> int:
+    return math.isqrt(2 * edgeVectorSize) + 1
 
-        edge_vector_size = edge_vector.shape[1]
-        axis_size = self.calcAdjMatrixAxisSizeFromEdgeVectorSize(edge_vector_size)
-        adj = torch.zeros((edge_vector.shape[0], axis_size, axis_size))
-        index = 0
-        for i1 in range(axis_size - 1):
-            for i2 in range(i1 + 1, axis_size):
-                edges = edge_vector[:, index]
-                adj[:, i1, i2] = edges
-                adj[:, i2, i1] = edges
-                index += 1
+def edgeVectorToAdjMatrix(edge_vector: Tensor) -> Tensor:
+    """
+    Converts an edge vector tensor to an adjacency matrix.
+    The input must be of shape [batch_size (can be omitted), edge_vector_size].
+    """
+    unsqueezed = False
+    if len(edge_vector.shape) == 1:
+        edge_vector = edge_vector.unsqueeze(0)
+        unsqueezed = True
 
-        if unsqueezed:
-            adj = adj.squeeze(0)
+    edge_vector_size = edge_vector.shape[1]
+    axis_size = calcAdjMatrixAxisSizeFromEdgeVectorSize(edge_vector_size)
+    adj = torch.zeros((edge_vector.shape[0], axis_size, axis_size))
+    index = 0
+    for i1 in range(axis_size - 1):
+        for i2 in range(i1 + 1, axis_size):
+            edges = edge_vector[:, index]
+            adj[:, i1, i2] = edges
+            adj[:, i2, i1] = edges
+            index += 1
 
-        return adj
+    if unsqueezed:
+        adj = adj.squeeze(0)
 
-    def adjMatrixToEdgeVector(self, adj_matrix: Tensor) -> Tensor:
-        """
-        Turns the given adjacency matrix into an edge vector. You may also pass a batch of adjacency matrices
-        to get a batch of edge vectors.
-        """
-        unsqueezed = False
-        if len(adj_matrix.shape) < 3:
-            adj_matrix = adj_matrix.unsqueeze(0)
+    return adj
 
-        axis_size = adj_matrix.shape[2]
+def adjMatrixToEdgeVector(adj_matrix: Tensor) -> Tensor:
+    """
+    Turns the given adjacency matrix into an edge vector. You may also pass a batch of adjacency matrices
+    to get a batch of edge vectors.
+    """
+    unsqueezed = False
+    if len(adj_matrix.shape) < 3:
+        adj_matrix = adj_matrix.unsqueeze(0)
+        unsqueezed = True
 
-        if axis_size != adj_matrix.shape[1]:
-            raise RuntimeError(
-                "The given adjacency matrix's dimensions are not of the same size! How can this be an adjacency matrix??")
+    axis_size = adj_matrix.shape[2]
 
-        edge_vector = []
-        for i1 in range(axis_size - 1):
-            for i2 in range(i1 + 1, axis_size):
-                edge_vector.append(adj_matrix[:, i1, i2])
+    if axis_size != adj_matrix.shape[1]:
+        raise RuntimeError(
+            "The given adjacency matrix's dimensions are not of the same size! How can this be an adjacency matrix??")
 
-        edge_vector = torch.stack(edge_vector).T
+    edge_vector = []
+    for i1 in range(axis_size - 1):
+        for i2 in range(i1 + 1, axis_size):
+            edge_vector.append(adj_matrix[:, i1, i2])
 
-        if unsqueezed:
-            edge_vector = edge_vector.squeeze(0)
-        return edge_vector
+    edge_vector = torch.stack(edge_vector).T
+
+    if unsqueezed:
+        edge_vector = edge_vector.squeeze(0)
+    return edge_vector
 
 
 def collate_encoded_parts_list(graphs_and_labels: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, Tensor]:
@@ -347,7 +350,7 @@ if __name__ == '__main__':
     print("Initializing network...")
     network = LSTMGraphPredictor(encoder.get_encoding_size()).to(device)
 
-    # network.load_state_dict(torch.load(f"{root_path}/data/trained_lstm_250_epochs_raw_plus_30_epochs_BCE.dat"))
+    # network.load_state_dict(torch.load(f"{root_path}/data/trained_lstm_500_epochs.dat"))
 
     optimizer = optim.Adam(network.parameters(), lr=0.1)
     lr_scheduler = MultiStepLR(optimizer, milestones=[10, 30, 80, 150, 250], gamma=0.2)
@@ -359,7 +362,7 @@ if __name__ == '__main__':
     val_data_per_epoch = len(val_data_loader)
     val_iterator = iter(val_data)
 
-    epochs = 500
+    epochs = 3
 
     print("Starting training...")
     for epoch in range(epochs):
@@ -387,7 +390,7 @@ if __name__ == '__main__':
         lr_scheduler.step()
     print()
 
-    torch.save(network.state_dict(), f'{root_path}/data/trained_lstm_500_epochs.dat')
+    torch.save(network.state_dict(), f'{root_path}/data/trained_lstm.dat')
 
     x_epochs = list(range(1, epochs + 1))
     plt.plot(x_epochs, loss_per_epoch, color='blue', label='Training loss')
