@@ -124,7 +124,7 @@ class LSTMGraphPredictor(nn.Module):
         eval = F.relu(self.evaluator_fc2(eval))
         eval = self.evaluator_norm2(eval)
         eval = self.evaluator_fc3(eval)
-        eval = torch.sigmoid(self.evaluator_fc4(eval))
+        eval = self.evaluator_fc4(eval)
 
         return torch.squeeze(eval, 1)  # Turn output per batch from 1-element-vector into scalar
 
@@ -323,6 +323,24 @@ def get_cuda_memory_info():
     a = round(torch.cuda.memory_allocated(0) / (1024.0 ** 2))
     return f"{a}/{r}/{t} MiB"
 
+def custom_loss(input: Tensor, target: Tensor) -> Tensor:
+    false_negative_penalty = 25 # False negatives are penalized additionally by this factor
+    elem_len = target.shape[-1]
+    return F.binary_cross_entropy_with_logits(
+        input,
+        target,
+        weight=None,
+        pos_weight=(torch.ones(elem_len) * false_negative_penalty).to(device),
+        reduction='mean',
+    )
+    # unreduced_loss = -1 * (false_negative_penalty * (target * torch.log(prediction)) + ((1 - target) * torch.log(1 - prediction)))
+    # unreduced_clamped_loss = torch.clamp(unreduced_loss, min=-100, max=100)
+    # result = torch.mean(unreduced_clamped_loss)
+    # if float(result) is float('nan'):
+    #     print("Well damn.")
+    # return result
+
+
 if __name__ == '__main__':
 
     print("Loading encoder...")
@@ -354,7 +372,7 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(network.parameters(), lr=0.1)
     lr_scheduler = MultiStepLR(optimizer, milestones=[10, 30, 80, 150, 250], gamma=0.2)
-    lossCriterion = nn.BCELoss()
+    lossCriterion = custom_loss #nn.BCELoss()
     loss_per_epoch = []
     val_loss = []
 
@@ -362,7 +380,7 @@ if __name__ == '__main__':
     val_data_per_epoch = len(val_data_loader)
     val_iterator = iter(val_data)
 
-    epochs = 3
+    epochs = 30
 
     print("Starting training...")
     for epoch in range(epochs):

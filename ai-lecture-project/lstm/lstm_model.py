@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
     # Load the final model
 
-    model_file_path = f"{root_path}/data/trained_lstm_50_epochs.dat"
+    model_file_path = f"{root_path}/data/trained_lstm.dat"
     encoder = OneHotEncoder()
     prediction_model: MyPredictionModel = LSTMGraphPredictionModel(model_file_path, encoder)
 
