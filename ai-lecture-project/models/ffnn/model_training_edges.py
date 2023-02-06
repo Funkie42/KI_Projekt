@@ -1,22 +1,17 @@
-from typing import List, Dict
-from typing import Tuple
+from typing import List
 
 import torch
 import torch.nn as nn
-from torch import optim, Tensor
+from torch import Tensor
 import pickle
 from sklearn.model_selection import train_test_split
 
 
 import models.ffnn.feedforward_neural_network as ffnn
-import encoder.auto_encoder_trainer as encoder_trainer
 import encoder.auto_encoder_decoder as auto_encoder
 from config.config import device, root_path
-from encoder.binary_encoder import BinaryEncoder
 from encoder.one_hot_encoder import OneHotEncoder
 from graph import Graph
-from node import Node
-from part import Part
 from util.graph_utils import toEdgeVector, toEncodedPartPairs
 
 encoder = auto_encoder.loadPretrainedAutoEncoder()
@@ -28,12 +23,7 @@ hidden_dim_2 = 101
 hidden_dim_3 = 10
 output_dim = 1
 
-n_epochs = 4
-
-
-
-
-
+n_epochs = 1
 
 def constructModelTrainingData() -> (Tensor, Tensor):
     """
@@ -110,8 +100,6 @@ if __name__ == '__main__':
                             total = total
                         if reality == 1:
                             existing_edges += 1
-
-                            #print("Reality:",reality,"Prediction:",prediction)
                         total += 1
 
                 accuracy = 100 * correct / total

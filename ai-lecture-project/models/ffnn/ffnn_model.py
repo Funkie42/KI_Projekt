@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     # Load the final model
 
-    model_file_path = f"{root_path}/data/trained_ffnn_4_epochs.dat"
+    model_file_path = f"{root_path}/data/trained_ffnn_1_epochs.dat"
     encoder = OneHotEncoder()
 
     prediction_model: MyPredictionModel = FFNNGraphPredictionModel(model_file_path, encoder)

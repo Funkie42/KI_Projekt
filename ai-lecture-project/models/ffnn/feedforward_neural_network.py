@@ -26,10 +26,10 @@ class FeedforwardNeuralNetwork(nn.Module):
     def forward(self, input):
         # Output ist das, was mal output sein wird
         output = self.fc1(input)
-        #output = F.relu(output)
+        output = F.relu(output)
         output = self.fc2(output)
         output = self.fc3(output)
-        #output = F.relu(output)
+        output = F.relu(output)
         output = self.fc4(output)
         output = self.sigmoid(output)
         return output
