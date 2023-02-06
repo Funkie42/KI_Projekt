@@ -10,7 +10,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import random_split, DataLoader
 
-from config.config import device, preload_device, root_path
+from config.config import device, preload_device, root_path, get_cuda_memory_info
 from datasets.edge_vector_dataset import EdgeVectorDataset
 from encoder.one_hot_encoder import OneHotEncoder
 from lstm.positional_encoding import PositionalEncoding
@@ -315,13 +315,7 @@ def predict(network: nn.Module, data_loader: DataLoader, lossCriterion, optimize
 
     return loss_sum / data_len
 
-def get_cuda_memory_info():
-    if (device == 'cpu'):
-        return "-"
-    t = round(torch.cuda.get_device_properties(0).total_memory / (1024.0 ** 2))
-    r = round(torch.cuda.memory_reserved(0) / (1024.0 ** 2))
-    a = round(torch.cuda.memory_allocated(0) / (1024.0 ** 2))
-    return f"{a}/{r}/{t} MiB"
+
 
 if __name__ == '__main__':
 

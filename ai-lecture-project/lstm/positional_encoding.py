@@ -32,17 +32,16 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
 
-if __name__ == 'main':
-    p1 = Part(1, 2)
-    p2 = Part(1, 3)
-    p3 = Part(1, 2)
-    p4 = Part(1, 3)
+p1 = Part(1, 2)
+p2 = Part(1, 3)
+p3 = Part(1, 2)
+p4 = Part(1, 3)
 
-    encoder = OneHotEncoder()
-    tensor = torch.stack((encoder.encode(p1), encoder.encode(p2), encoder.encode(p3), encoder.encode(p4)))
+encoder = OneHotEncoder()
+tensor = torch.stack((encoder.encode(p1), encoder.encode(p2), encoder.encode(p3), encoder.encode(p4)))
 
-    print(tensor)
+print(tensor)
 
-    encoding = PositionalEncoding(encoder.get_encoding_size())
-    tensor2 = encoding(tensor)
-    print(tensor2)
+encoding = PositionalEncoding(encoder.get_encoding_size())
+tensor2 = encoding(tensor)
+print(tensor2)
