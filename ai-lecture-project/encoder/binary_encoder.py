@@ -1,5 +1,4 @@
-import numpy as np
-from numpy import ndarray, float32
+from torch import Tensor
 
 from encoder.abstract_encoder import AbstractEncoder
 from part import Part
@@ -16,7 +15,7 @@ class BinaryEncoder(AbstractEncoder):
     def get_encoding_size(self):
         return PART_ID_BITS + FAMILY_ID_BITS
 
-    def encode(self, part: Part) -> ndarray:
+    def encode(self, part: Part) -> Tensor:
         array = [0.0] * (PART_ID_BITS + FAMILY_ID_BITS)
         partId = int(part.get_part_id())
         familyId = int(part.get_family_id())
@@ -27,9 +26,9 @@ class BinaryEncoder(AbstractEncoder):
             else:
                 array[i] = familyId % 2
                 familyId //= 2
-        return np.array(array, dtype=float32)
+        return Tensor(array)
 
-    def decode(self, part: ndarray) -> Part:
+    def decode(self, part: Tensor) -> Part:
         bits = [0] * (PART_ID_BITS + FAMILY_ID_BITS)
         for i in range(PART_ID_BITS + FAMILY_ID_BITS):
             bits[i] = 1 if part[i] > 0.5 else 0

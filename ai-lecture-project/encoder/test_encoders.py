@@ -1,9 +1,9 @@
 import unittest
 
-import numpy as np
+import torch
 
-from encoder.one_hot_encoder import OneHotEncoder
 from encoder.binary_encoder import BinaryEncoder
+from encoder.one_hot_encoder import OneHotEncoder
 from part import Part
 
 
@@ -19,8 +19,8 @@ class TestEncoder(unittest.TestCase):
     def test_binary_encode(self):
         self.sut = BinaryEncoder()
         encoding = self.sut.encode(Part(13, 2))
-        expectedEncoding = [1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0] + [0, 1, 0, 0, 0, 0, 0]
-        self.assertTrue((np.array(expectedEncoding) == encoding).all())
+        expectedEncoding = torch.Tensor([1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0] + [0, 1, 0, 0, 0, 0, 0])
+        self.assertTrue((expectedEncoding == encoding).all())
 
     def test_decodeself_onehot(self):
         self.sut = OneHotEncoder()
@@ -28,7 +28,6 @@ class TestEncoder(unittest.TestCase):
         self.verifyEncodeSelf(Part(17, 99))
         self.verifyEncodeSelf(Part(2201, 1))
         self.verifyEncodeSelf(Part(158, 23))
-
 
     def verifyEncodeSelf(self, part: Part):
         encoding = self.sut.encode(part)
