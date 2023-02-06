@@ -23,7 +23,7 @@ hidden_dim_2 = 101
 hidden_dim_3 = 10
 output_dim = 1
 
-n_epochs = 1
+n_epochs = 2
 
 def constructModelTrainingData() -> (Tensor, Tensor):
     """

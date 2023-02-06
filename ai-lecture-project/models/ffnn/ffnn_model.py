@@ -2,6 +2,7 @@ import pickle
 from typing import Set, List
 
 import torch
+from sklearn.model_selection import train_test_split
 from torch import Tensor
 
 from config.config import root_path, device
@@ -58,16 +59,34 @@ class FFNNGraphPredictionModel(MyPredictionModel):
 if __name__ == '__main__':
     # Load train data
     with open(f'{root_path}/data/graphs.dat', 'rb') as file:
-        train_graphs: List[Graph] = pickle.load(file)
+        graphs: List[Graph] = pickle.load(file)
 
     # Load the final model
 
-    model_file_path = f"{root_path}/data/trained_ffnn_1_epochs.dat"
+    model_file_path = f"{root_path}/data/trained_ffnn_2_epochs.dat"
     encoder = OneHotEncoder()
+
+    _, train_graphs = train_test_split(graphs, random_state=1, test_size=0.1)
 
     prediction_model: MyPredictionModel = FFNNGraphPredictionModel(model_file_path, encoder)
 
     # For illustration, compute eval score on train data
     instances = [(graph.get_parts(), graph) for graph in train_graphs[:100]]
+    eval_score = evaluate(prediction_model, instances)
+    print(f"Edge accuracy: {round(eval_score, 1)}%")
+
+    instances = [(graph.get_parts(), graph) for graph in train_graphs[100:200]]
+    eval_score = evaluate(prediction_model, instances)
+    print(f"Edge accuracy: {round(eval_score, 1)}%")
+
+    instances = [(graph.get_parts(), graph) for graph in train_graphs[200:300]]
+    eval_score = evaluate(prediction_model, instances)
+    print(f"Edge accuracy: {round(eval_score, 1)}%")
+
+    instances = [(graph.get_parts(), graph) for graph in train_graphs[300:400]]
+    eval_score = evaluate(prediction_model, instances)
+    print(f"Edge accuracy: {round(eval_score, 1)}%")
+
+    instances = [(graph.get_parts(), graph) for graph in train_graphs[400:500]]
     eval_score = evaluate(prediction_model, instances)
     print(f"Edge accuracy: {round(eval_score, 1)}%")

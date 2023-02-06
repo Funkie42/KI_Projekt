@@ -28,6 +28,7 @@ class FeedforwardNeuralNetwork(nn.Module):
         output = self.fc1(input)
         output = F.relu(output)
         output = self.fc2(output)
+        output = F.relu(output)
         output = self.fc3(output)
         output = F.relu(output)
         output = self.fc4(output)
