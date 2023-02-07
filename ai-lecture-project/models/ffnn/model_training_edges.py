@@ -23,7 +23,7 @@ hidden_dim_2 = 101
 hidden_dim_3 = 10
 output_dim = 1
 
-n_epochs = 2
+n_epochs = 5
 
 def constructModelTrainingData() -> (Tensor, Tensor):
     """
@@ -67,6 +67,8 @@ if __name__ == '__main__':
     iterator = 0
 
     print("Start training")
+    accuracy_improvement = []
+    old_acc = 0
 
     for epoch in range(n_epochs):
         for (input, validate) in zip(*(X_train, y_train)):
@@ -78,6 +80,13 @@ if __name__ == '__main__':
             iterator += 1
 
             if iterator % 100 == 0:
+
+                if (iterator % 2000 == 1900):
+                    acc = sum(accuracy_improvement) / len(accuracy_improvement)
+
+                    print(f"Old accuracy: {old_acc}, new accuracy: {acc}")
+                    accuracy_improvement = []
+                    old_acc = acc
                 # Calculate Accuracy
                 correct = 0
                 total = 0
@@ -105,8 +114,11 @@ if __name__ == '__main__':
                 accuracy = 100 * correct / total
                 real_edge_accuracy = 100 * correct_existing_edges / existing_edges
 
+                accuracy_improvement.append(accuracy)
+
                 # Print Loss
                 print('Iteration: {}. Loss: {}. Accuracy: {}. Real Edge Accuracy: {}.'.format(iterator, loss.item(), accuracy, real_edge_accuracy))
+
     torch.save(network.state_dict(), f'{root_path}/data/trained_ffnn_{n_epochs}_epochs.dat')
 
 

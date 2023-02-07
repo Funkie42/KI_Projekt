@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     # Load the final model
 
-    model_file_path = f"{root_path}/data/trained_ffnn_2_epochs.dat"
+    model_file_path = f"{root_path}/data/trained_ffnn_5_epochs.dat"
     encoder = OneHotEncoder()
 
     _, train_graphs = train_test_split(graphs, random_state=1, test_size=0.1)
