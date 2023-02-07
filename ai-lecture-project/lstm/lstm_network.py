@@ -76,7 +76,7 @@ class LSTMGraphPredictor(nn.Module):
         for elem in lstm_input:
             (lstm_hidden_state, lstm_cell_state) = self.builder(elem, (lstm_hidden_state, lstm_cell_state))
 
-        return lstm_hidden_state
+        return lstm_cell_state
 
     def makeEncodedPartPair(self, x, part1_index, part2_index):
         """
