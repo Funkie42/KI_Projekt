@@ -6,3 +6,10 @@ scikit-learn=1.2.0
 urllib3
 
 torch=1.13.1
+torch~=1.13.1
+pandas~=1.5.3
+numpy~=1.24.1
+matplotlib~=3.6.3
+scikit-learn~=1.2.0
+networkx~=3.0
+xgboost~=1.7.3
