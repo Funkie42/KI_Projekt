@@ -15,7 +15,7 @@ from models.lstm.lstm_network import LSTMGraphPredictor, calcAdjMatrixAxisSizeFr
 from part import Part
 from util.graph_utils import toEncodedPartPairs_fromParts, optimize_edge_vector
 
-
+# The
 class FFNNGraphPredictionModel(MyPredictionModel):
 
     def __init__(self, file_path: str, encoder: AbstractEncoder):
@@ -57,36 +57,21 @@ class FFNNGraphPredictionModel(MyPredictionModel):
         return self.construct_graph_from_edge_vector(parts, predicted_edge_vector)
 
 if __name__ == '__main__':
-    # Load train data
+    # Lade die train data
     with open(f'{root_path}/data/graphs.dat', 'rb') as file:
         graphs: List[Graph] = pickle.load(file)
 
-    # Load the final model
-
-    model_file_path = f"{root_path}/data/trained_ffnn_5_epochs.dat"
+    # Lade das finale Model
+    model_file_path = f"{root_path}/data/trained_ffnn_50_epochs.dat"
     encoder = OneHotEncoder()
 
+    # Splite die Daten und nehme nur Testdaten her. Gleicher Random_state wie im Training
     _, train_graphs = train_test_split(graphs, random_state=1, test_size=0.1)
 
+    #Lade das Modell
     prediction_model: MyPredictionModel = FFNNGraphPredictionModel(model_file_path, encoder)
 
-    # For illustration, compute eval score on train data
+    # Test der Score
     instances = [(graph.get_parts(), graph) for graph in train_graphs[:100]]
-    eval_score = evaluate(prediction_model, instances)
-    print(f"Edge accuracy: {round(eval_score, 1)}%")
-
-    instances = [(graph.get_parts(), graph) for graph in train_graphs[100:200]]
-    eval_score = evaluate(prediction_model, instances)
-    print(f"Edge accuracy: {round(eval_score, 1)}%")
-
-    instances = [(graph.get_parts(), graph) for graph in train_graphs[200:300]]
-    eval_score = evaluate(prediction_model, instances)
-    print(f"Edge accuracy: {round(eval_score, 1)}%")
-
-    instances = [(graph.get_parts(), graph) for graph in train_graphs[300:400]]
-    eval_score = evaluate(prediction_model, instances)
-    print(f"Edge accuracy: {round(eval_score, 1)}%")
-
-    instances = [(graph.get_parts(), graph) for graph in train_graphs[400:500]]
     eval_score = evaluate(prediction_model, instances)
     print(f"Edge accuracy: {round(eval_score, 1)}%")
