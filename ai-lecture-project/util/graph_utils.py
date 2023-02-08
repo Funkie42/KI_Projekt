@@ -4,6 +4,7 @@ from typing import List, Dict, Set
 import torch
 from torch import Tensor
 
+from graph import Graph
 from node import Node
 from part import Part
 
@@ -21,6 +22,7 @@ def toEdgeVector(graph):
                 edgeVector.append(0.0)
     return torch.Tensor(edgeVector)
 
+
 def toEncodedPartPairs(graph, encoder):
     nodelist: List[Node] = list(graph.get_nodes())
     encoded_nodelist = []
@@ -33,6 +35,7 @@ def toEncodedPartPairs(graph, encoder):
             encoded_part_pairs.append(part_pair_tensor)
     return torch.stack(encoded_part_pairs)
 
+
 def toEncodedPartPairs_fromParts(parts: Set[Part], encoder):
     partlist: List[Part] = list(parts)
     encoded_partlist = []
@@ -44,6 +47,7 @@ def toEncodedPartPairs_fromParts(parts: Set[Part], encoder):
             part_pair_tensor = torch.cat((part_tensor, part2_tensor))
             encoded_part_pairs.append(part_pair_tensor)
     return torch.stack(encoded_part_pairs)
+
 
 def calcEdgeVectorSizeFromAdjMatrixAxisSize(adjMatrixAxisSize: int) -> int:
     return (adjMatrixAxisSize ** 2 - adjMatrixAxisSize) // 2
@@ -87,6 +91,7 @@ def optimize_edge_vector(edge_vector: Tensor) -> Tensor:
 
     return adjMatrixToEdgeVector(adj_matrix)
 
+
 def adjMatrixToEdgeVector(adj_matrix: Tensor) -> Tensor:
     """
     Turns the given adjacency matrix into an edge vector. You may also pass a batch of adjacency matrices
@@ -114,4 +119,15 @@ def adjMatrixToEdgeVector(adj_matrix: Tensor) -> Tensor:
         edge_vector = edge_vector.squeeze(0)
     return edge_vector
 
+
+def construct_graph_from_edge_vector(parts: List[Part], edge_vector: Tensor) -> Graph:
+    graph = Graph()
+    index = 0
+    for p1 in range(len(parts) - 1):
+        for p2 in range(p1 + 1, len(parts)):
+            edge_probability = edge_vector[index]
+            if edge_probability >= 0.5:
+                graph.add_undirected_edge(parts[p1], parts[p2])
+            index += 1
+    return graph
 

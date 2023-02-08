@@ -8,8 +8,9 @@ from torch import Tensor
 from config.config import root_path, device
 from encoder.abstract_encoder import AbstractEncoder
 from encoder.one_hot_encoder import OneHotEncoder
-from evaluation import MyPredictionModel, evaluate
+from evaluation import evaluate
 from graph import Graph
+from models.abstract_prediction_model import MyPredictionModel
 from models.ffnn.feedforward_neural_network import FeedforwardNeuralNetwork
 from models.lstm.lstm_network import LSTMGraphPredictor, calcAdjMatrixAxisSizeFromEdgeVectorSize, adjMatrixToEdgeVector
 from part import Part
