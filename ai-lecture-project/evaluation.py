@@ -5,8 +5,11 @@ import pickle
 from typing import Dict, List, Set, Tuple
 
 from config import config
+from config.config import root_path
+from encoder.one_hot_encoder import OneHotEncoder
 from graph import Graph
 from models.abstract_prediction_model import MyPredictionModel
+from models.ffnn.ffnn_model import FFNNGraphPredictionModel
 from models.xGBoostApproach.xgboost_prediction_model import XGBoostModel
 from models.xGBoostApproach.data_converter import DataConverter
 
@@ -109,8 +112,14 @@ def load_xgboost_model():
 
 
 def load_ffnn_model():
-    # TODO Marius, hier dein Model erstellen/laden und zurückgeben
-    return None
+    # Lade das finale Model
+    model_file_path = f"{root_path}/data/trained_ffnn_50_epochs.dat"
+    encoder = OneHotEncoder()
+
+    # Lade das Modell
+    prediction_model: MyPredictionModel = FFNNGraphPredictionModel(model_file_path, encoder)
+    print("Loaded model ", model_file_path)
+    return prediction_model
 
 
 if __name__ == '__main__':
@@ -125,8 +134,8 @@ if __name__ == '__main__':
     # For illustration, compute eval score on train data
     instances = [(graph.get_parts(), graph) for graph in train_graphs[:100]]
 
-    # eval_score_ffnn = evaluate(ffnn_prediction_model, instances)
+    eval_score_ffnn = evaluate(ffnn_prediction_model, instances)
     eval_score_xgboost = evaluate(xgboost_prediction_model, instances)
 
-    # print("Evaluation Score of FFNN Model: ", eval_score_ffnn)
+    print("Evaluation Score of FFNN Model: ", eval_score_ffnn)
     print("Evaluation Score of XGBoost Model: ", eval_score_xgboost)
