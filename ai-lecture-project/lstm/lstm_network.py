@@ -44,7 +44,7 @@ class LSTMGraphPredictor(nn.Module):
         self.evaluator_norm2 = nn.BatchNorm1d(num_features=evaluator_l3_size)
         self.evaluator_fc3 = nn.Linear(evaluator_l3_size, 1)
 
-        # He Initialization for all layers using ReLU
+        # He Initialization for all layers which use ReLU
         torch.nn.init.kaiming_uniform_(self.query_fc1.weight, nonlinearity='relu')
         torch.nn.init.kaiming_uniform_(self.query_fc2.weight, nonlinearity='relu')
         torch.nn.init.kaiming_uniform_(self.evaluator_fc1.weight, nonlinearity='relu')
@@ -443,18 +443,5 @@ if __name__ == '__main__':
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend(loc="lower left")
-    # plt.ylim(0, 1)
     plt.show()
 
-    # plt.plot(x_loss, grad_qf1, color='red', label='Gradient query fc1')
-    # plt.plot(x_loss, grad_qe1, color='blue', label='Gradient evaluator fc1')
-    # plt.plot(x_loss, grad_qe4, color='green', label='Gradient evaluator fc4')
-    #
-    # plt.title("LSTM Gradient sizes")
-    # plt.xlabel("Generation")
-    # plt.ylabel("Gradient length")
-    # plt.legend(loc="lower left")
-    # plt.ylim(0, 0.001)
-    # plt.show()
-
-    print()
