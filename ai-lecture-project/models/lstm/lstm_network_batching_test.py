@@ -2,10 +2,8 @@ import torch
 from torch.utils.data import random_split, DataLoader
 
 from datasets.edge_vector_dataset import EdgeVectorDataset
-from encoder.auto_encoder_decoder import loadPretrainedAutoEncoder
-from encoder.debug_encoder import DebugEncoder
 from encoder.one_hot_encoder import OneHotEncoder
-from lstm.lstm_network import collate_encoded_parts_list, LSTMGraphPredictor
+from models.lstm.lstm_network import collate_encoded_parts_list, LSTMGraphPredictor
 
 """
 This file runs the same training data once as batch, once as single instances and verifies that the results match up.

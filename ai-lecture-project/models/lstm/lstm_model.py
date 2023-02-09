@@ -7,9 +7,9 @@ from torch import Tensor
 from config.config import root_path, device
 from encoder.abstract_encoder import AbstractEncoder
 from encoder.one_hot_encoder import OneHotEncoder
-from evaluation import MyPredictionModel, evaluate
+from models.abstract_prediction_model import MyPredictionModel
 from graph import Graph
-from lstm.lstm_network import LSTMGraphPredictor, calcAdjMatrixAxisSizeFromEdgeVectorSize, adjMatrixToEdgeVector
+from models.lstm.lstm_network import LSTMGraphPredictor, calcAdjMatrixAxisSizeFromEdgeVectorSize, adjMatrixToEdgeVector
 from part import Part
 
 
@@ -49,10 +49,11 @@ def optimize_edge_vector(edge_vector: Tensor) -> Tensor:
 
 class LSTMGraphPredictionModel(MyPredictionModel):
 
-    def __init__(self, file_path: str, encoder: AbstractEncoder):
+    def __init__(self, encoder: AbstractEncoder = OneHotEncoder(), file_path = None):
         self.encoder = encoder
         self.network = LSTMGraphPredictor(encoder.get_encoding_size()).to(device)
-        self.network.load_state_dict(torch.load(file_path, map_location=device))
+        if file_path != None:
+            self.network.load_state_dict(torch.load(file_path, map_location=device))
         self.network.eval()
 
     def construct_graph_from_edge_vector(self, parts: List[Part], edge_vector: Tensor) -> Graph:
@@ -85,11 +86,11 @@ if __name__ == '__main__':
 
     # Load the final model
 
-    model_file_path = f"{root_path}/data/trained_lstm.dat"
+    model_file_path = None # f"{root_path}/data/trained_lstm.dat"
     encoder = OneHotEncoder()
-    prediction_model: MyPredictionModel = LSTMGraphPredictionModel(model_file_path, encoder)
+    prediction_model: MyPredictionModel = LSTMGraphPredictionModel(encoder)
 
     # For illustration, compute eval score on train data
     instances = [(graph.get_parts(), graph) for graph in train_graphs[:100]]
-    eval_score = evaluate(prediction_model, instances)
-    print(f"Edge accuracy: {round(eval_score, 1)}%")
+    #eval_score = evaluate(prediction_model, instances)
+    #print(f"Edge accuracy: {round(eval_score, 1)}%")

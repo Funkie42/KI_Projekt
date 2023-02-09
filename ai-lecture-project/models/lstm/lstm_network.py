@@ -13,7 +13,7 @@ from torch.utils.data import random_split, DataLoader
 from config.config import device, root_path
 from datasets.edge_vector_dataset import EdgeVectorDataset
 from encoder.one_hot_encoder import OneHotEncoder
-from lstm.positional_encoding import PositionalEncoding
+from models.lstm.positional_encoding import PositionalEncoding
 
 
 class LSTMGraphPredictor(nn.Module):

@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from itertools import permutations
 import numpy as np
 import pickle
@@ -10,10 +9,10 @@ from encoder.one_hot_encoder import OneHotEncoder
 from graph import Graph
 from models.abstract_prediction_model import MyPredictionModel
 from models.ffnn.ffnn_model import FFNNGraphPredictionModel
+from models.lstm.lstm_model import LSTMGraphPredictionModel
 from models.xGBoostApproach.xgboost_prediction_model import XGBoostModel
 from models.xGBoostApproach.data_converter import DataConverter
 
-from node import Node
 from part import Part
 
 
@@ -121,6 +120,10 @@ def load_ffnn_model():
     print("Loaded model ", model_file_path)
     return prediction_model
 
+def load_lstm_model():
+    # There is no trained model because they are just as bad and they are too large for git to handle
+    return LSTMGraphPredictionModel()
+
 
 if __name__ == '__main__':
     # Load train data
@@ -130,12 +133,15 @@ if __name__ == '__main__':
     # Load the final model
     xgboost_prediction_model: MyPredictionModel = load_xgboost_model()
     ffnn_prediction_model: MyPredictionModel = load_ffnn_model()
+    lstm_prediction_model: MyPredictionModel = load_lstm_model()
 
     # For illustration, compute eval score on train data
     instances = [(graph.get_parts(), graph) for graph in train_graphs[:100]]
 
     eval_score_ffnn = evaluate(ffnn_prediction_model, instances)
     eval_score_xgboost = evaluate(xgboost_prediction_model, instances)
+    eval_score_lstm = evaluate(lstm_prediction_model, instances)
 
     print("Evaluation Score of FFNN Model: ", eval_score_ffnn)
     print("Evaluation Score of XGBoost Model: ", eval_score_xgboost)
+    print("Evaluation Score of LSTM Model: ", eval_score_lstm)

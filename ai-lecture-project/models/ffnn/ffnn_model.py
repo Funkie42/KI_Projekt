@@ -36,7 +36,7 @@ class FFNNGraphPredictionModel(MyPredictionModel):
         parts = list(parts)
         encoded_parts_pair_tensor = toEncodedPartPairs_fromParts(parts, self.encoder)
 
-        predicted_edge_vector = self.network(encoded_parts_pair_tensor)
+        predicted_edge_vector = self.network(encoded_parts_pair_tensor.to(device))
         predicted_edge_vector = optimize_edge_vector(predicted_edge_vector)
         predicted_edge_vector = predicted_edge_vector.to(device)
 
