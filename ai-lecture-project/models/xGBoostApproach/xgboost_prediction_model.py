@@ -30,7 +30,7 @@ class XGBoostModel(MyPredictionModel):
         self.x_train, self.y_train, self.x_test, self.y_test = dc.get_data()
         # Use an XGBoostClassifier to predict if two parts are connected by an edge
         # given extra information specified in DataConverter.get_instance()
-        self.xg_classifier = xgb.XGBClassifier(objective='binary:logistic')
+        self.xg_classifier = xgb.XGBClassifier(objective='binary:logistic', n_estimators=1000)
 
     def predict_graph(self, parts: Set[Part]) -> Graph:
         parts = list(parts)
@@ -79,16 +79,16 @@ class XGBoostModel(MyPredictionModel):
 #     with open(f'{root_path}/data/graphs.dat', 'rb') as file:
 #         train_graphs: List[Graph] = pickle.load(file)
 #
-#     dc = DataConverter(train_graphs, save_instances_version=None, load_instances_version=None)
+#     dc = DataConverter(train_graphs, save_instances_version=None, load_instances_version=40)
 #     model = XGBoostModel(dc)
 #
-#     # model.train()
-#     # model.save('model1')
+#     model.train()
+#     model.save('model_1000_estimators')
 #
-#     model.load('model1')
+#     # model.load('model1')
 #
 #     model.evaluate()
 #
-#     instances = [(graph.get_parts(), graph) for graph in train_graphs[:1000]]
-#     eval_score = evaluate(model, instances)
-#     print(eval_score)
+#     # instances = [(graph.get_parts(), graph) for graph in train_graphs[:1000]]
+#     # eval_score = evaluate(model, instances)
+#     # print(eval_score)

@@ -104,7 +104,7 @@ def load_xgboost_model():
     # Could pass dataset for training to DataConverter, but not necessary for loading a finished model
     model = XGBoostModel(DataConverter(None))
     # The exact path is specified in the load function of the model object.
-    model.load('model1')
+    model.load('model_500_estimators')
     return model
 
 
