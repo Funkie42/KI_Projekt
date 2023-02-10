@@ -32,7 +32,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
 
-if __name__ == '__main__':
+if __name__ == 'main':
     p1 = Part(1, 2)
     p2 = Part(1, 3)
     p3 = Part(1, 2)

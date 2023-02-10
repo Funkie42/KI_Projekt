@@ -4,17 +4,16 @@ from typing import List, Tuple
 import torch
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
-from torch import nn, optim, Tensor
+from torch import nn, optim, Tensor, BoolTensor
 from torch.nn import LSTMCell
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import random_split, DataLoader
 
-from config.config import device, preload_device, root_path, get_cuda_memory_info
+from config.config import device, root_path
 from datasets.edge_vector_dataset import EdgeVectorDataset
 from encoder.one_hot_encoder import OneHotEncoder
 from models.lstm.positional_encoding import PositionalEncoding
-from util.graph_utils import *
 
 
 class LSTMGraphPredictor(nn.Module):
@@ -25,25 +24,27 @@ class LSTMGraphPredictor(nn.Module):
         self.part_encoding_size = encoded_part_size
 
         self.input_dim = encoded_part_size
-        self.builder_hidden_dim = 900
+        self.builder_hidden_dim = 600
         self.construction_plan_size = self.builder_hidden_dim
         self.builder = LSTMCell(input_size=self.input_dim, hidden_size=self.builder_hidden_dim, bias=True)
 
-        self.query_size = 300
+        self.query_size = 200
         self.query_in_size = 2 * encoded_part_size
         self.query_pos_encoder = PositionalEncoding(d_model=self.part_encoding_size)
         self.query_fc1 = nn.Linear(self.query_in_size, 600)
         self.query_fc2 = nn.Linear(600, self.query_size)
         self.query_norm = nn.BatchNorm1d(num_features=self.query_size)
 
-        self.evaluator_fc1 = nn.Linear(self.construction_plan_size + self.query_size, 400)
-        self.evaluator_norm1 = nn.BatchNorm1d(num_features=400)
-        self.evaluator_fc2 = nn.Linear(400, 50)
-        self.evaluator_norm2 = nn.BatchNorm1d(num_features=50)
-        self.evaluator_fc3 = nn.Linear(50, 8)
-        self.evaluator_fc4 = nn.Linear(8, 1)
+        evaluator_l1_size = self.construction_plan_size + self.query_size
+        evaluator_l2_size = 300
+        evaluator_l3_size = 75
+        self.evaluator_fc1 = nn.Linear(evaluator_l1_size, evaluator_l2_size)
+        self.evaluator_norm1 = nn.BatchNorm1d(num_features=evaluator_l2_size)
+        self.evaluator_fc2 = nn.Linear(evaluator_l2_size, evaluator_l3_size)
+        self.evaluator_norm2 = nn.BatchNorm1d(num_features=evaluator_l3_size)
+        self.evaluator_fc3 = nn.Linear(evaluator_l3_size, 1)
 
-        # He Initialization for all layers using ReLU
+        # He Initialization for all layers which use ReLU
         torch.nn.init.kaiming_uniform_(self.query_fc1.weight, nonlinearity='relu')
         torch.nn.init.kaiming_uniform_(self.query_fc2.weight, nonlinearity='relu')
         torch.nn.init.kaiming_uniform_(self.evaluator_fc1.weight, nonlinearity='relu')
@@ -77,7 +78,7 @@ class LSTMGraphPredictor(nn.Module):
         for elem in lstm_input:
             (lstm_hidden_state, lstm_cell_state) = self.builder(elem, (lstm_hidden_state, lstm_cell_state))
 
-        return lstm_hidden_state
+        return lstm_cell_state
 
     def makeEncodedPartPair(self, x, part1_index, part2_index):
         """
@@ -125,7 +126,7 @@ class LSTMGraphPredictor(nn.Module):
         eval = F.relu(self.evaluator_fc2(eval))
         eval = self.evaluator_norm2(eval)
         eval = self.evaluator_fc3(eval)
-        eval = torch.sigmoid(self.evaluator_fc4(eval))
+        # eval = self.evaluator_fc4(eval)
 
         return torch.squeeze(eval, 1)  # Turn output per batch from 1-element-vector into scalar
 
@@ -195,6 +196,12 @@ class LSTMGraphPredictor(nn.Module):
 
         return result
 
+def calcEdgeVectorSizeFromAdjMatrixAxisSize(adjMatrixAxisSize: int) -> int:
+    return (adjMatrixAxisSize ** 2 - adjMatrixAxisSize) // 2
+
+
+def calcAdjMatrixAxisSizeFromEdgeVectorSize(edgeVectorSize: int) -> int:
+    return math.isqrt(2 * edgeVectorSize) + 1
 
 def edgeVectorToAdjMatrix(edge_vector: Tensor) -> Tensor:
     """
@@ -222,10 +229,35 @@ def edgeVectorToAdjMatrix(edge_vector: Tensor) -> Tensor:
 
     return adj
 
+def adjMatrixToEdgeVector(adj_matrix: Tensor) -> Tensor:
+    """
+    Turns the given adjacency matrix into an edge vector. You may also pass a batch of adjacency matrices
+    to get a batch of edge vectors.
+    """
+    unsqueezed = False
+    if len(adj_matrix.shape) < 3:
+        adj_matrix = adj_matrix.unsqueeze(0)
+        unsqueezed = True
+
+    axis_size = adj_matrix.shape[2]
+
+    if axis_size != adj_matrix.shape[1]:
+        raise RuntimeError(
+            "The given adjacency matrix's dimensions are not of the same size! How can this be an adjacency matrix??")
+
+    edge_vector = []
+    for i1 in range(axis_size - 1):
+        for i2 in range(i1 + 1, axis_size):
+            edge_vector.append(adj_matrix[:, i1, i2])
+
+    edge_vector = torch.stack(edge_vector).T
+
+    if unsqueezed:
+        edge_vector = edge_vector.squeeze(0)
+    return edge_vector
 
 
-
-def collate_encoded_parts_list(graphs_and_labels: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, Tensor]:
+def collate_encoded_parts_list(graphs_and_labels: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, Tuple[Tensor, BoolTensor]]:
     """
     Collate function for edge_vector labelled and part-encoded graphs. The first element of each tuple is the parts
     entry, the second element the label (edge vector). Each parts entry must be a two-dimensional tensor where
@@ -233,6 +265,7 @@ def collate_encoded_parts_list(graphs_and_labels: List[Tuple[Tensor, Tensor]]) -
     All elements must have the same encoding size.
 
     Returns a 2-tuple. The first element is the tensor containing a batch input, the second element is the labelling.
+    The labelling is a tensor together with a binary mask.
     """
     encoding_size = len(graphs_and_labels[0][0][0])
     max_amount_parts = 0
@@ -244,21 +277,25 @@ def collate_encoded_parts_list(graphs_and_labels: List[Tuple[Tensor, Tensor]]) -
 
     result_graphs = []
     result_labels = []
+    result_masks = []
     for (g, l) in graphs_and_labels:
         result_graph = g
         result_label = l
+        result_mask = torch.ones(len(l), dtype=torch.bool).to(g.device)
         length = len(g)
         if length < max_amount_parts:
-            zero_parts = torch.zeros((max_amount_parts - length, encoding_size)).to(preload_device)
+            zero_parts = torch.zeros((max_amount_parts - length, encoding_size)).to(g.device)
             result_graph = torch.cat((zero_parts, g), dim=0)
-            zero_labels = torch.zeros(max_edge_vector_size - len(l)).to(preload_device)
+            zero_labels = torch.zeros(max_edge_vector_size - len(l)).to(g.device)
+            zero_mask = torch.zeros_like(zero_labels, dtype=torch.bool).to(g.device)
             # Since we prepended the "null" parts, the edge vector's first elements will refer to those. Thus,
             # we can also set all of them to zero.
             result_label = torch.cat((zero_labels, l), dim=0)
+            result_mask = torch.cat((zero_mask, result_mask), dim=0)
         result_graphs.append(result_graph)
         result_labels.append(result_label)
-    return torch.stack(result_graphs), torch.stack(result_labels)
-
+        result_masks.append(result_mask)
+    return torch.stack(result_graphs), (torch.stack(result_labels), torch.stack(result_masks).type(torch.bool))
 
 def get_gradient_size(module) -> float:
     return float(module.weight.grad.pow(2).sum())
@@ -285,6 +322,34 @@ def predict(network: nn.Module, data_loader: DataLoader, lossCriterion, optimize
 
     return loss_sum / data_len
 
+def get_cuda_memory_info():
+    if (device == 'cpu'):
+        return "-"
+    t = round(torch.cuda.get_device_properties(0).total_memory / (1024.0 ** 2))
+    r = round(torch.cuda.memory_reserved(0) / (1024.0 ** 2))
+    a = round(torch.cuda.memory_allocated(0) / (1024.0 ** 2))
+    return f"{a}/{r}/{t} MiB"
+
+def custom_loss(input: Tensor, target: Tuple[Tensor, BoolTensor]) -> Tensor:
+    false_negative_penalty = 25 # False negatives are penalized additionally by this factor
+    (target_tensor, target_mask) = target
+    elem_len = target_tensor.shape[-1]
+    loss_tensor = F.binary_cross_entropy_with_logits(
+        input,
+        target_tensor,
+        weight=None,
+        pos_weight=(torch.ones(elem_len) * false_negative_penalty).to(input.device),
+        reduction='none',
+    )
+    # Ignore parts of prediction which come from padding - target_mask tells us which ones to consider
+    masked_loss = torch.masked_select(loss_tensor, target_mask)
+    return torch.mean(masked_loss)
+    # unreduced_loss = -1 * (false_negative_penalty * (target * torch.log(prediction)) + ((1 - target) * torch.log(1 - prediction)))
+    # unreduced_clamped_loss = torch.clamp(unreduced_loss, min=-100, max=100)
+    # result = torch.mean(unreduced_clamped_loss)
+    # if float(result) is float('nan'):
+    #     print("Well damn.")
+    # return result
 
 
 if __name__ == '__main__':
@@ -294,7 +359,7 @@ if __name__ == '__main__':
 
     print("Preparing data...")
     base_dataset = EdgeVectorDataset(part_encoder=encoder)
-    (train_data, val_data, test_data) = random_split(base_dataset, [0.7, 0.15, 0.15],
+    (train_data, val_data, test_data) = random_split(base_dataset, [0.99, 0.005, 0.005],
                                                      generator=torch.Generator().manual_seed(7))
 
     torch.manual_seed(7)
@@ -318,18 +383,27 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(network.parameters(), lr=0.1)
     lr_scheduler = MultiStepLR(optimizer, milestones=[10, 30, 80, 150, 250], gamma=0.2)
-    lossCriterion = nn.BCELoss()
+    lossCriterion = custom_loss #nn.BCELoss()
     loss_per_epoch = []
     val_loss = []
+    q1_weight_size_per_epoch = []
+    e3_weight_size_per_epoch = []
 
     data_per_epoch = len(train_data_loader)
     val_data_per_epoch = len(val_data_loader)
     val_iterator = iter(val_data)
 
-    epochs = 3
+    (test_g, test_l) = test_data[1]
+    print(f"Sample label:\n {test_l}")
+
+    epochs = 4
 
     print("Starting training...")
     for epoch in range(epochs):
+        sample_pred = network(test_g)
+        sample_loss = lossCriterion(sample_pred, (test_l, torch.ones_like(test_l, dtype=torch.bool).type(torch.bool)))
+        print(f"{sample_pred}: {sample_loss}")
+
         loss_per_epoch.append(
             predict(
                 network,
@@ -351,6 +425,10 @@ if __name__ == '__main__':
                 message=f"Validation underway. Epoch {epoch + 1}/{epochs} batch {{}} (CUDA memory usage: {get_cuda_memory_info()})"
             )
         )
+
+        q1_weight_size_per_epoch.append(float(network.query_fc1.weight.abs().mean().to("cpu")))
+        e3_weight_size_per_epoch.append(float(network.evaluator_fc3.weight.abs().mean().to("cpu")))
+
         lr_scheduler.step()
     print()
 
@@ -359,22 +437,11 @@ if __name__ == '__main__':
     x_epochs = list(range(1, epochs + 1))
     plt.plot(x_epochs, loss_per_epoch, color='blue', label='Training loss')
     plt.plot(x_epochs, val_loss, color='red', label='Validation loss')
+    plt.plot(x_epochs, q1_weight_size_per_epoch, color='orange', label='Query L1 weight size')
+    plt.plot(x_epochs, e3_weight_size_per_epoch, color='violet', label='Evaluator L3 weight size')
     plt.title("LSTM Network loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend(loc="lower left")
-    # plt.ylim(0, 1)
     plt.show()
 
-    # plt.plot(x_loss, grad_qf1, color='red', label='Gradient query fc1')
-    # plt.plot(x_loss, grad_qe1, color='blue', label='Gradient evaluator fc1')
-    # plt.plot(x_loss, grad_qe4, color='green', label='Gradient evaluator fc4')
-    #
-    # plt.title("LSTM Gradient sizes")
-    # plt.xlabel("Generation")
-    # plt.ylabel("Gradient length")
-    # plt.legend(loc="lower left")
-    # plt.ylim(0, 0.001)
-    # plt.show()
-
-    print()
