@@ -106,7 +106,7 @@ def load_xgboost_model():
     # Could pass dataset for training to DataConverter, but not necessary for loading a finished model
     model = XGBoostModel(DataConverter(None))
     # The exact path is specified in the load function of the model object.
-    model.load('model_500_estimators')
+    model.load('model_1500_estimators')
     return model
 
 
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     lstm_prediction_model: MyPredictionModel = load_lstm_model()
 
     # For illustration, compute eval score on train data
-    instances = [(graph.get_parts(), graph) for graph in train_graphs[:100]]
+    instances = [(graph.get_parts(), graph) for graph in train_graphs[-1000:]]
 
     eval_score_ffnn = evaluate(ffnn_prediction_model, instances)
     eval_score_xgboost = evaluate(xgboost_prediction_model, instances)
